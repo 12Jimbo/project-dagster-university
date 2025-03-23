@@ -1,0 +1,29 @@
+[32m2025-03-23 12:11:22 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - 6109f330-8731-4969-b6f7-ea1b7a513773 - 127627 - LOGS_CAPTURED - Started capturing logs in process (pid: 127627).
+[32m2025-03-23 12:11:22 +0000[0m - dagster - [34mDEBUG[0m - __ASSET_JOB - 6109f330-8731-4969-b6f7-ea1b7a513773 - 127627 - taxi_trips - STEP_START - Started execution of step "taxi_trips".
+[32m2025-03-23 12:13:04 +0000[0m - dagster - [34mERROR[0m - [31m__ASSET_JOB - 6109f330-8731-4969-b6f7-ea1b7a513773 - 127627 - taxi_trips - STEP_FAILURE - Execution of step "taxi_trips" failed.
+
+dagster._core.errors.DagsterExecutionStepExecutionError: Error occurred while executing op "taxi_trips"::
+
+duckdb.duckdb.IOException: IO Error: Could not set lock on file "/workspaces/project-dagster-university/dagster_university/dagster_essentials/data/staging/data.duckdb": Conflicting lock is held in /usr/local/bin/python3.11 (PID 53636). See also https://duckdb.org/docs/connect/concurrency
+
+Stack Trace:
+  File "/usr/local/lib/python3.11/site-packages/dagster/_core/execution/plan/utils.py", line 56, in op_execution_error_boundary
+    yield
+  File "/usr/local/lib/python3.11/site-packages/dagster/_utils/__init__.py", line 480, in iterate_with_context
+    next_output = next(iterator)
+                  ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/dagster/_core/execution/plan/compute_generator.py", line 127, in _coerce_op_compute_fn_to_iterator
+    result = invoke_compute_fn(
+             ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/dagster/_core/execution/plan/compute_generator.py", line 115, in invoke_compute_fn
+    return fn(context, **args_to_pass) if context_arg_provided else fn(**args_to_pass)
+                                                                    ^^^^^^^^^^^^^^^^^^
+  File "/workspaces/project-dagster-university/dagster_university/dagster_essentials/dagster_essentials/assets/trips.py", line 49, in taxi_trips
+    conn = backoff(
+           ^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/dagster/_utils/backoff.py", line 71, in backoff
+    raise to_raise
+  File "/usr/local/lib/python3.11/site-packages/dagster/_utils/backoff.py", line 65, in backoff
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+[0m

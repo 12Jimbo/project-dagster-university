@@ -7,6 +7,7 @@ import geopandas as gpd
 
 import duckdb
 import os
+from dagster._utils.backoff import backoff
 
 @dg.asset(deps=['taxi_trips', 'taxi_zones'])
 def manhattan_stats() -> None:
@@ -21,7 +22,12 @@ def manhattan_stats() -> None:
             group by zone, borough, geometry
     """
 
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
+    conn = backoff(
+        fn=duckdb.connect,
+        max_retries=10,
+        retry_on=(RuntimeError, duckdb.IOException),
+        kwargs={"database": os.getenv("DUCKDB_DATABASE")}
+    )
     trips_by_zone = conn.execute(query).fetch_df()
 
     trips_by_zone["geometry"] = gpd.GeoSeries.from_wkt(trips_by_zone["geometry"])
@@ -59,19 +65,26 @@ def trips_by_week() -> None:
                 SUM(total_amount) as total_amount,
                 SUM(trip_distance) as trip_distance,
             FROM trips
+            WHERE pickup_datetime >= '2023-01-01' AND pickup_datetime < '2023-04-01'
             GROUP BY DATE_TRUNC('week', pickup_datetime)
+            ORDER BY period  
             """
     
     # 2. connect to the database
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
+    conn = backoff(
+        fn=duckdb.connect,
+        max_retries=10,
+        retry_on=(RuntimeError, duckdb.IOException),
+        kwargs={"database": os.getenv("DUCKDB_DATABASE")}
+    )
     
     # 3. run query through the connection
     df = conn.execute(query).fetch_df()
     
     # Write to file
     with open(constants.TRIPS_BY_WEEK_FILE_PATH, 'w') as output_file:
-        output_file.write(df.to_csv())
+        output_file.write(df.to_csv(index=False))
 
 
 print('Metrics created')
-
+print(os.getenv("DUCKDB_DATABASE"))
