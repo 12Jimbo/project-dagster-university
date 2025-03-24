@@ -87,4 +87,3 @@ def trips_by_week() -> None:
 
 
 print('Metrics created')
-print(os.getenv("DUCKDB_DATABASE"))
