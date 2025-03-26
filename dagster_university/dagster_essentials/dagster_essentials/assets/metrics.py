@@ -88,9 +88,3 @@ def trips_by_week() -> None:
 
 print('Metrics created')
 
-# prova push commit
-
-# prova push sync
-
-# 2 prova push sync
-# prova push sync 2
