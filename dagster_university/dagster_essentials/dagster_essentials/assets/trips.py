@@ -26,12 +26,14 @@ def taxi_zones_file() -> None:
 import duckdb
 import os
 from dagster._utils.backoff import backoff
+# or:
+from dagster_duckdb import DuckDBResource
 
 @dg.asset(deps=['taxi_trips_file'])
-def taxi_trips() -> None:
+def taxi_trips(database: DuckDBResource) -> None:
     # 1. define the query to create the table named trips
     query = """create or replace table trips as (
-          select
+          SELECT
             VendorID as vendor_id,
             PULocationID as pickup_zone_id,
             DOLocationID as dropoff_zone_id,
@@ -42,48 +44,56 @@ def taxi_trips() -> None:
             trip_distance as trip_distance,
             passenger_count as passenger_count,
             total_amount as total_amount
-          from 'data/raw/taxi_trips_2023-03.parquet'
+          FROM 'data/raw/taxi_trips_2023-03.parquet'
         );"""
     
-    # 2. connect to the database
-    conn = backoff(
-        fn=duckdb.connect,
-        max_retries=10,
-        retry_on=(RuntimeError, duckdb.IOException),
-        kwargs={"database": os.getenv("DUCKDB_DATABASE")}
-    )
-
+    # 2. connect to the database without using the resource
+    # conn = backoff(
+    #     fn=duckdb.connect,
+    #     max_retries=10,
+    #     retry_on=(RuntimeError, duckdb.IOException),
+    #     kwargs={"database": os.getenv("DUCKDB_DATABASE")}
+    # )
     # 3. run query through the connection
-    conn.execute(query)
+    # conn.execute(query)
+    
+    # 2+3. connect to the database and run the query using the defined resource
+    with database.get_connection() as conn:
+        conn.execute(query)
+
+    
 
 @dg.asset(
     deps=["taxi_zones_file"]
 )
-def taxi_zones() -> None:
+def taxi_zones(database: DuckDBResource) -> None:
     # 1. define the query to create the table named zones
     query = f"""
         create or replace table zones as (
-            select
+            SELECT
                 LocationID as zone_id,
                 zone,
                 borough,
                 the_geom as geometry
-            from '{constants.TAXI_ZONES_FILE_PATH}'
+            FROM '{constants.TAXI_ZONES_FILE_PATH}'
         );
     """
 
-    # 2. connect to the database
-    conn = backoff(
-        fn=duckdb.connect,
-        retry_on=(RuntimeError, duckdb.IOException),
-        kwargs={
-            "database": os.getenv("DUCKDB_DATABASE"),
-        },
-        max_retries=10,
-    )
+    # # 2. connect to the database
+    # conn = backoff(
+    #     fn=duckdb.connect,
+    #     retry_on=(RuntimeError, duckdb.IOException),
+    #     kwargs={
+    #         "database": os.getenv("DUCKDB_DATABASE"),
+    #     },
+    #     max_retries=10,
+    # )
 
-    # 3. run query through the connection
-    conn.execute(query)
-
+    # # 3. run query through the connection
+    # conn.execute(query)
+    
+    # 2+3. connect to the database and run the query using the defined resource
+    with database.get_connection() as conn:
+        conn.execute(query)
 
 print('Trips created')

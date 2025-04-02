@@ -7,28 +7,35 @@ import geopandas as gpd
 
 import duckdb
 import os
+
 from dagster._utils.backoff import backoff
+# or:
+from dagster_duckdb import DuckDBResource
 
 @dg.asset(deps=['taxi_trips', 'taxi_zones'])
-def manhattan_stats() -> None:
+def manhattan_stats(database: DuckDBResource) -> None:
     query = """
-            select
+            SELECT
                 zones.zone,
                 zones.borough,
                 zones.geometry,
                 count(*) as trip_count
-            from trips left join zones on trips.pickup_zone_id = zones.zone_id
-            where borough = 'Manhattan' and geometry is not null
-            group by zone, borough, geometry
+            FROM trips left join zones on trips.pickup_zone_id = zones.zone_id
+            WHERE borough = 'Manhattan' and geometry is not null
+            GROUP BY zone, borough, geometry
     """
 
-    conn = backoff(
-        fn=duckdb.connect,
-        max_retries=10,
-        retry_on=(RuntimeError, duckdb.IOException),
-        kwargs={"database": os.getenv("DUCKDB_DATABASE")}
-    )
-    trips_by_zone = conn.execute(query).fetch_df()
+    # connect to the database
+    # conn = backoff(
+    #     fn=duckdb.connect,
+    #     max_retries=10,
+    #     retry_on=(RuntimeError, duckdb.IOException),
+    #     kwargs={"database": os.getenv("DUCKDB_DATABASE")}
+    # )
+
+    # connecto to the database using the defined resource
+    with database.get_connection() as conn:
+        trips_by_zone = conn.execute(query).fetch_df()
 
     trips_by_zone["geometry"] = gpd.GeoSeries.from_wkt(trips_by_zone["geometry"])
     trips_by_zone = gpd.GeoDataFrame(trips_by_zone)
@@ -56,7 +63,7 @@ def manhattan_map() -> None:
 
 
 @dg.asset(deps = ['taxi_trips'])
-def trips_by_week() -> None:
+def trips_by_week(database: DuckDBResource) -> None:
     query = """
             SELECT
                 DATE_TRUNC('week', pickup_datetime) as period,
@@ -71,16 +78,20 @@ def trips_by_week() -> None:
             """
     
     # 2. connect to the database
-    conn = backoff(
-        fn=duckdb.connect,
-        max_retries=10,
-        retry_on=(RuntimeError, duckdb.IOException),
-        kwargs={"database": os.getenv("DUCKDB_DATABASE")}
-    )
+    # conn = backoff(
+    #     fn=duckdb.connect,
+    #     max_retries=10,
+    #     retry_on=(RuntimeError, duckdb.IOException),
+    #     kwargs={"database": os.getenv("DUCKDB_DATABASE")}
+    # )
     
     # 3. run query through the connection
-    df = conn.execute(query).fetch_df()
+    # df = conn.execute(query).fetch_df()
     
+    # 2+3. connect to the database and run the query using the defined resource
+    with database.get_connection() as conn:
+        df = conn.execute(query).fetch_df()
+
     # Write to file
     with open(constants.TRIPS_BY_WEEK_FILE_PATH, 'w') as output_file:
         output_file.write(df.to_csv(index=False))
